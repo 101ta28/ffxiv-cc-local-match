@@ -1,6 +1,4 @@
-# base
-
-![参考画像](https://user-images.githubusercontent.com/3541096/189569643-052e886c-1ff4-46c6-b5a1-d0ccf2383143.png)
+# FFXIV Crystalline Conflict Tool
 
 ## Project setup
 
