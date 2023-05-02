@@ -4,7 +4,7 @@ node_modules
 
 # local env files
 .env
-firebaseConfig.js
+firebase.js
 
 # Log files
 npm-debug.log*
