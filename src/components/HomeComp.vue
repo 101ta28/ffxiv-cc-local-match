@@ -12,7 +12,6 @@
       <v-col cols="auto">
         <v-btn color="primary" to="/create" min-width="228" size="x-large" variant="flat">
           <v-icon icon="mdi-speedometer" size="large" start />
-
           マッチを作成
         </v-btn>
       </v-col>

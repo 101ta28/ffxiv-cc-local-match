@@ -71,14 +71,17 @@
 </template>
 
 <script setup>
-import { db } from '@/firebase';
+import { db } from '@/firebase/firebase.js';
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 const inputJob = ref('');
 const userName = ref('');
 const inputRank = ref('');
 
 const alertMessage = ref('');
+
+const router = useRouter();
 
 const jobList = ref([
   "ナイト",
@@ -320,10 +323,13 @@ const createMatch = () => {
       items: items.value,
     })
     .then(() => {
-      alertMessage.value = 'データを追加しました';
-      setTimeout(() => {
-        alertMessage.value = "";
-      }, 10000);
+      db.collection('matchs')
+        .get()
+        .then((querySnapshot) => {
+          querySnapshot.forEach((doc) => {
+            router.push(`/matchs/${doc.id}`);
+          });
+        });
     })
     .catch((error) => {
       alertMessage.value = 'データの追加に失敗しました';
