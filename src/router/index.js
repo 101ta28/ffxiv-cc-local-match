@@ -17,16 +17,13 @@ const routes = [
     ],
   },
   {
-    path: '/create',
+    path: '/match-create',
     component: () => import('@/layouts/default/Default.vue'),
     children: [
       {
         path: '',
         name: 'CreateMatch',
-        // route level code-splitting
-        // this generates a separate chunk (about.[hash].js) for this route
-        // which is lazy-loaded when the route is visited.
-        component: () => import(/* webpackChunkName: "home" */ '@/views/CreateMatch'),
+        component: () => import('@/views/CreateMatch.vue'),
       },
     ],
   },
@@ -37,14 +34,10 @@ const routes = [
       {
         path: '',
         name: 'Match',
-        // route level code-splitting
-        // this generates a separate chunk (about.[hash].js) for this route
-        // which is lazy-loaded when the route is visited.
-        component: () => import(/* webpackChunkName: "home" */ '@/views/Match.vue'),
+        component: () => import('@/views/Match.vue'),
       },
     ],
   },
-  // /matchに来たときは/にリダイレクト
   {
     path: '/match',
     redirect: '/',

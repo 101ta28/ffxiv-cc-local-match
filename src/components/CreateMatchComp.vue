@@ -5,339 +5,188 @@
         {{ alertMessage }}
       </v-alert>
 
+      <v-alert v-if="successMessage" type="success" dismissible>
+        {{ successMessage }}
+      </v-alert>
+
       <div class="py-3" />
 
-      <h3 class="text-h4 font-weight-bold">はじめに、データの入力をしましょう</h3>
+      <h3 class="text-h4 font-weight-bold">対戦を開始しましょう</h3>
 
       <div class="py-7" />
 
+      <!-- チーム選択とランダム振り分けボタン -->
       <v-row class="d-flex align-center justify-center">
         <v-col cols="4">
-          <v-select v-model="inputJob" :items="jobList" label="ジョブ" outlined />
+          <v-select v-model="selectedTeam" :items="teamList" label="チーム選択" outlined />
         </v-col>
         <v-col cols="4">
-          <v-text-field v-model="userName" label="キャラクター名" outlined />
-        </v-col>
-        <v-col cols="4">
-          <v-select v-model="inputRank" :items="rankList" label="階級" outlined />
+          <v-btn color="primary" @click="randomizeTeams">ランダムにチーム分け</v-btn>
         </v-col>
       </v-row>
-      <!-- データ追加ボタンを作り、押すと下にテーブルを表示させる -->
+
+      <!-- データ保存ボタンと試合履歴ボタン -->
       <v-row class="d-flex align-center justify-center">
         <v-col cols="auto">
-          <v-btn color="primary" min-width="228" size="x-large" variant="flat" @click="addItem">
-            <v-icon icon="mdi-plus" size="large" start />
-            データ追加
-          </v-btn>
+          <v-btn color="success" @click="saveMatchData">試合データを保存</v-btn>
         </v-col>
         <v-col cols="auto">
-          <v-btn color="success" min-width="228" size="x-large" variant="flat" @click="createMatch">
-            <v-icon icon="mdi-sword-cross" size="large" start />
-            対戦を開始
-          </v-btn>
+          <v-btn color="info" @click="showMatchHistory">試合履歴を見る</v-btn>
         </v-col>
       </v-row>
+
+      <!-- 対戦キャラクター一覧テーブル -->
       <v-table class="elevation-1">
         <thead>
           <tr>
-            <th class="text-center">
-            </th>
-            <th class="text-center">
-              ジョブ
-            </th>
-            <th class="text-center">
-              キャラクター名
-            </th>
-            <th class="text-center">
-              階級
-            </th>
+            <th class="text-center">キャラクター名</th>
+            <th class="text-center">ジョブ</th>
+            <th class="text-center">得点</th>
+            <th class="text-center">得点調整</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(item, key) in Object.entries(items)" :key="key">
+          <tr v-for="(character, name, index) in Object.entries(items)" :key="index">
+            <td>{{ name }}</td>
+            <td>{{ character.job }}</td>
+            <td>{{ character.score }}</td>
             <td>
-              <v-btn color="error" icon variant="flat" @click="deleteItem(item[0])">
-                <v-icon>mdi-close</v-icon>
-              </v-btn>
+              <v-btn color="primary" @click="incrementScore(name)">+1</v-btn>
+              <v-btn color="secondary" @click="decrementScore(name)">-1</v-btn>
             </td>
-            <td>{{ item[1].result[0].job }}</td>
-            <td>{{ item[0] }}</td>
-            <td>{{ item[1].rank }}</td>
           </tr>
         </tbody>
       </v-table>
     </v-responsive>
+
+    <!-- 試合履歴モーダル -->
+    <v-dialog v-model="isMatchHistoryDialogOpen" max-width="600px">
+      <v-card>
+        <v-card-title>
+          <span class="text-h5">試合履歴</span>
+        </v-card-title>
+
+        <v-card-text>
+          <v-simple-table>
+            <thead>
+              <tr>
+                <th class="text-left">ユーザー名</th>
+                <th class="text-left">チーム</th>
+                <th class="text-left">得点</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr v-for="match in paginatedMatches" :key="match.id">
+                <td>{{ match.user }}</td>
+                <td>{{ match.team }}</td>
+                <td>{{ match.score }}</td>
+              </tr>
+            </tbody>
+          </v-simple-table>
+
+          <v-pagination v-model="currentPage" :length="numberOfPages"></v-pagination>
+        </v-card-text>
+
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="blue darken-1" text @click="isMatchHistoryDialogOpen = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script setup>
 import { db } from '@/firebase/firebase.js';
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
 
-const inputJob = ref('');
-const userName = ref('');
-const inputRank = ref('');
+// Firestoreからデータを取得する関数
+const fetchItems = async () => {
+  try {
+    const response = await db.collection('items').get();
+    items.value = response.docs.map(doc => doc.data());
+  } catch (error) {
+    alertMessage.value = 'データの取得に失敗しました: ' + error.message;
+  }
+};
 
-const alertMessage = ref('');
+// 初期データの取得
+fetchItems();
 
-const router = useRouter();
-
-const jobList = ref([
-  "ナイト",
-  "戦士",
-  "暗黒騎士",
-  "ガンブレイカー",
-  "白魔道士",
-  "学者",
-  "占星術師",
-  "賢者",
-  "モンク",
-  "竜騎士",
-  "忍者",
-  "侍",
-  "リーパー",
-  "吟遊詩人",
-  "機工士",
-  "踊り子",
-  "召喚士",
-  "赤魔道士",
-  "黒魔道士"
+// 定数とリアクティブな参照の定義
+const alertMessage = ref(null);
+const successMessage = ref(null);
+const selectedTeam = ref(null);
+const items = ref({});
+const teamList = ref([
+  { text: '選択してください', value: null },
+  { text: 'アストラ', value: 'Astra' },
+  { text: 'アンブラ', value: 'Umbra' }
 ]);
 
-const rankList = ref([
-  "ブロンズ",
-  "シルバー",
-  "ゴールド",
-  "プラチナ",
-  "ダイヤモンド",
-  "クリスタル"
-]);
+// チーム分けをランダムに行う関数
+const randomizeTeams = () => {
+  const keys = Object.keys(items.value);
+  const half = Math.ceil(keys.length / 2);
+  const shuffledKeys = keys.sort(() => Math.random() - 0.5);
+  const teamAstra = shuffledKeys.slice(0, half);
+  const teamUmbra = shuffledKeys.slice(half);
 
-// たぶん使わない
-// const jobObj = ref(
-//   {
-//     "ナイト": "PLD",
-//     "戦士": "WAR",
-//     "暗黒騎士": "DRK",
-//     "ガンブレイカー": "GNB",
-//     "白魔道士": "WHM",
-//     "学者": "SCH",
-//     "占星術師": "AST",
-//     "賢者": "SGE",
-//     "モンク": "MNK",
-//     "竜騎士": "DRG",
-//     "忍者": "NIN",
-//     "侍": "SAM",
-//     "リーパー": "RPR",
-//     "吟遊詩人": "BRD",
-//     "機工士": "MCH",
-//     "踊り子": "DNC",
-//     "召喚士": "SMN",
-//     "赤魔道士": "RDM",
-//     "黒魔道士": "BLM",
-//   }
-// );
+  teamAstra.forEach(key => items.value[key].team = 'Astra');
+  teamUmbra.forEach(key => items.value[key].team = 'Umbra');
+};
 
-const itemTemplate = computed(() => {
-  return {
-    [userName.value]: {
-      rank: inputRank.value,
-      'winning point': 0,
-      result: [
-        {
-          job: inputJob.value,
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-  };
+// 試合データを保存する関数
+const saveMatchData = async () => {
+  try {
+    await db.collection('matches').add({
+      teams: selectedTeam.value,
+      items: items.value
+    });
+    successMessage.value = '試合データを保存しました';
+  } catch (error) {
+    alertMessage.value = 'データの保存に失敗しました: ' + error.message;
+  }
+};
+
+// 試合履歴を表示するためのリアクティブな参照と関数
+const matches = ref([]);
+const isMatchHistoryDialogOpen = ref(false);
+const currentPage = ref(1);
+const itemsPerPage = ref(5);
+
+const fetchMatches = async () => {
+  try {
+    const response = await db.collection('matches').get();
+    matches.value = response.docs.map(doc => doc.data());
+  } catch (error) {
+    alertMessage.value = '試合履歴の取得に失敗しました: ' + error.message;
+  }
+};
+
+const showMatchHistory = () => {
+  fetchMatches();
+  isMatchHistoryDialogOpen.value = true;
+};
+
+const paginatedMatches = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
+  return matches.value.slice(start, end);
 });
 
-// const items = ref({});
-const items = ref(
-  {
-    'Test 1': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 2': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 3': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 4': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 5': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 6': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 7': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 8': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 9': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
-    'Test 10': {
-      rank: 'ブロンズ',
-      'winning point': 0,
-      result: [
-        {
-          job: 'BLM',
-          team: '',
-          k: '',
-          d: '',
-          a: '',
-        },
-      ],
-    },
+const numberOfPages = computed(() => Math.ceil(matches.value.length / itemsPerPage.value));
+
+// 得点を増やす関数
+const incrementScore = (characterName) => {
+  items.value[characterName].score++;
+};
+
+// 得点を減らす関数
+const decrementScore = (characterName) => {
+  if (items.value[characterName].score > 0) {
+    items.value[characterName].score--;
   }
-);
-
-const addItem = () => {
-  // 全データが入力されているかチェック
-  if (!inputJob.value || !userName.value || !inputRank.value) {
-    alertMessage.value = '全ての項目を入力してください';
-    setTimeout(() => {
-      alertMessage.value = "";
-    }, 10000);
-    return;
-  }
-  // items.value = { ...items.value, ...itemTemplate.value };
-  items.value = Object.assign({}, items.value, itemTemplate.value);
-  // データリセット
-  inputJob.value = '';
-  userName.value = '';
-  inputRank.value = '';
-  console.log(items.value);
 };
-
-const deleteItem = (key) => {
-  delete items.value[key];
-};
-
-// firebaseにデータを追加する
-// コレクションはmatchsでドキュメントIDは自動
-const createMatch = () => {
-  db.collection('matchs')
-    .add({
-      items: items.value,
-    })
-    .then(() => {
-      db.collection('matchs')
-        .get()
-        .then((querySnapshot) => {
-          querySnapshot.forEach((doc) => {
-            router.push(`/matchs/${doc.id}`);
-          });
-        });
-    })
-    .catch((error) => {
-      alertMessage.value = 'データの追加に失敗しました';
-      setTimeout(() => {
-        alertMessage.value = "";
-      }, 10000);
-      console.error('Error adding document: ', error);
-    });
-};
-
 </script>
